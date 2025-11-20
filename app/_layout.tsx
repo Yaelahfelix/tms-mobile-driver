@@ -17,6 +17,7 @@ import { MoonIcon, SunIcon } from "@/components/ui/icon";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Mapbox from "@rnmapbox/maps";
 import { MapboxToken } from "@/constants/Mapbox";
+import { AuthProvider } from "@/lib/auth";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -51,23 +52,25 @@ function RootLayoutNav() {
   const [colorMode, setColorMode] = useState<"light" | "dark">("light");
 
   return (
-    <GluestackUIProvider mode={colorMode}>
-      <GestureHandlerRootView>
-        <ThemeProvider value={colorMode === "dark" ? DarkTheme : DefaultTheme}>
-          <Slot />
-          {pathname === "/" && (
-            <Fab
-              onPress={() =>
-                setColorMode(colorMode === "dark" ? "light" : "dark")
-              }
-              className="m-6"
-              size="lg"
-            >
-              <FabIcon as={colorMode === "dark" ? MoonIcon : SunIcon} />
-            </Fab>
-          )}
-        </ThemeProvider>
-      </GestureHandlerRootView>
-    </GluestackUIProvider>
+    <AuthProvider>
+      <GluestackUIProvider mode={colorMode}>
+        <GestureHandlerRootView>
+          <ThemeProvider value={colorMode === "dark" ? DarkTheme : DefaultTheme}>
+            <Slot />
+            {pathname === "/" && (
+              <Fab
+                onPress={() =>
+                  setColorMode(colorMode === "dark" ? "light" : "dark")
+                }
+                className="m-6"
+                size="lg"
+              >
+                <FabIcon as={colorMode === "dark" ? MoonIcon : SunIcon} />
+              </Fab>
+            )}
+          </ThemeProvider>
+        </GestureHandlerRootView>
+      </GluestackUIProvider>
+    </AuthProvider>
   );
 }
