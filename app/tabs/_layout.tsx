@@ -17,6 +17,9 @@ export default function AppLayout() {
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="expensesInput" options={{ headerShown: true }} />
       <Stack.Screen name="tripDetail" options={{ headerShown: true }} />
+      <Stack.Screen name="documentTrip" options={{ title: "Dokumen Perjalanan" }} />
+      <Stack.Screen name="documentTripDetail" options={{ title: "Detail Dokumen" }} />
+      <Stack.Screen name="deliveryProof" options={{ title: "Dokumen Bukti Pengantaran" }} />
     </Stack>
   );
 }
