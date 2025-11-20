@@ -11,14 +11,38 @@ import {
 import { AlertCircleIcon } from "@/components/ui/icon";
 import { Input, InputField } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-
 import { VStack } from "@/components/ui/vstack";
-import { useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function Home() {
-  const [isInvalid, setIsInvalid] = useState(false);
-  const [inputValue, setInputValue] = useState("12345");
+export default function Login() {
+  const { login, token, loading } = useAuth();
+  const [email, setEmail] = useState("admin@example.com");
+  const [password, setPassword] = useState("password2025#");
+  const [error, setError] = useState<string | undefined>();
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!loading && token) {
+      router.replace("/tabs");
+    }
+  }, [loading, token]);
+
+  const handleLogin = async () => {
+    setError(undefined);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      router.replace("/tabs");
+    } catch (err) {
+      setError("Email atau kata sandi tidak valid");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 mx-5">
       <Center className="flex-1 w-full">
@@ -31,32 +55,21 @@ export default function Home() {
           </VStack>
 
           <VStack className="mt-10 gap-5">
-            <FormControl
-              // isInvalid={isInvalid}
-              size="md"
-              isDisabled={false}
-              isReadOnly={false}
-              isRequired={false}
-            >
+            <FormControl isInvalid={!!error} size="md">
               <FormControlLabel>
-                <FormControlLabelText>Username</FormControlLabelText>
+                <FormControlLabelText>Email</FormControlLabelText>
               </FormControlLabel>
               <Input className="my-1" size="md">
                 <InputField
                   type="text"
-                  placeholder="Masukkan username"
-                  value={inputValue}
-                  onChangeText={(text) => setInputValue(text)}
+                  placeholder="Masukkan email"
+                  value={email}
+                  autoCapitalize="none"
+                  onChangeText={setEmail}
                 />
               </Input>
             </FormControl>
-            <FormControl
-              // isInvalid={isInvalid}
-              size="md"
-              isDisabled={false}
-              isReadOnly={false}
-              isRequired={false}
-            >
+            <FormControl isInvalid={!!error} size="md">
               <FormControlLabel>
                 <FormControlLabelText>Password</FormControlLabelText>
               </FormControlLabel>
@@ -64,25 +77,27 @@ export default function Home() {
                 <InputField
                   type="password"
                   placeholder="password"
-                  value={inputValue}
-                  onChangeText={(text) => setInputValue(text)}
+                  value={password}
+                  onChangeText={setPassword}
                 />
               </Input>
-              <FormControlError>
-                <FormControlErrorIcon
-                  as={AlertCircleIcon}
-                  className="text-red-500"
-                />
-                <FormControlErrorText className="text-red-500">
-                  Password Salah
-                </FormControlErrorText>
-              </FormControlError>
+              {error && (
+                <FormControlError>
+                  <FormControlErrorIcon
+                    as={AlertCircleIcon}
+                    className="text-red-500"
+                  />
+                  <FormControlErrorText className="text-red-500">
+                    {error}
+                  </FormControlErrorText>
+                </FormControlError>
+              )}
             </FormControl>
           </VStack>
         </VStack>
       </Center>
-      <Button action="primary">
-        <ButtonText>Masuk</ButtonText>
+      <Button action="primary" onPress={handleLogin} isDisabled={submitting}>
+        <ButtonText>{submitting ? "Memproses..." : "Masuk"}</ButtonText>
       </Button>
     </SafeAreaView>
   );
