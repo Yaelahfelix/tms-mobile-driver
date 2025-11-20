@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: "https://abc.com",
+  baseURL: "https://tms-api.lumatech.co.id",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
