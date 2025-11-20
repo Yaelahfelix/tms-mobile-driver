@@ -13,6 +13,8 @@ import * as Location from "expo-location";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import type { FeatureCollection, LineString } from "geojson";
+import { Button, ButtonText } from "./ui/button";
+import { router } from "expo-router";
 
 const DESTINATION = {
   latitude: -6.1754,
@@ -242,11 +244,11 @@ export default function MapScreen() {
     : "--:--";
 
   return (
-      <View style={styles.container}>
-        <MapboxMap
-          style={styles.map}
-          styleURL={Mapbox.StyleURL.Street}
-          compassEnabled={false}
+    <View style={styles.container}>
+      <MapboxMap
+        style={styles.map}
+        styleURL={Mapbox.StyleURL.Street}
+        compassEnabled={false}
         logoEnabled={false}
         scaleBarEnabled={false}
       >
@@ -279,7 +281,11 @@ export default function MapScreen() {
         </PointAnnotation>
       </MapboxMap>
 
-      <BottomSheet index={0} snapPoints={snapPoints} enablePanDownToClose={false}>
+      <BottomSheet
+        index={0}
+        snapPoints={snapPoints}
+        enablePanDownToClose={false}
+      >
         <BottomSheetView style={styles.sheetContent}>
           <View style={styles.headerRow}>
             <View>
@@ -312,7 +318,9 @@ export default function MapScreen() {
                 <Text style={styles.destinationLabel}>Tujuan</Text>
                 <Text style={styles.destinationEta}>ETA 22 menit</Text>
               </View>
-              <Text style={styles.destinationValue}>Monumen Nasional, Jakarta</Text>
+              <Text style={styles.destinationValue}>
+                Monumen Nasional, Jakarta
+              </Text>
             </View>
           </View>
 
@@ -334,7 +342,9 @@ export default function MapScreen() {
           <View style={styles.timeline}>
             <View style={styles.timelineRow}>
               <View style={styles.timelineDot} />
-              <Text style={styles.timelineText}>Kendaraan: B 1234 AA (20 A)</Text>
+              <Text style={styles.timelineText}>
+                Kendaraan: B 1234 AA (20 A)
+              </Text>
             </View>
             <View style={styles.timelineRow}>
               <View style={[styles.timelineDot, styles.timelineDotActive]} />
@@ -351,12 +361,15 @@ export default function MapScreen() {
           </View>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={[styles.actionButton, styles.cancelButton]}>
-              <Text style={styles.actionText}>Batalkan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.completeButton]}>
-              <Text style={[styles.actionText, { color: "#FFFFFF" }]}>Selesaikan</Text>
-            </TouchableOpacity>
+            <Button
+              variant="outline"
+              onPress={() => router.push("/tabs/expensesInput")}
+            >
+              <ButtonText>Pengeluaran Perjalanan</ButtonText>
+            </Button>
+            <Button className="w-full">
+              <ButtonText>Selesaikan</ButtonText>
+            </Button>
           </View>
         </BottomSheetView>
       </BottomSheet>
@@ -559,7 +572,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   actionRow: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 12,
   },
   actionButton: {
