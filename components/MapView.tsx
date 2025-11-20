@@ -13,8 +13,6 @@ import * as Location from "expo-location";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import type { FeatureCollection, LineString } from "geojson";
-import { Button, ButtonText } from "./ui/button";
-import { router } from "expo-router";
 
 const DESTINATION = {
   latitude: -6.1754,
@@ -97,6 +95,8 @@ export default function MapScreen() {
     "Menunggu lokasi perangkat...",
   );
   const [routeCoords, setRouteCoords] = useState<Coordinate[]>([]);
+  const [routeDistance, setRouteDistance] = useState<number | null>(null);
+  const [routeDuration, setRouteDuration] = useState<number | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   const [journeyStart, setJourneyStart] = useState<Date | null>(null);
   const [initialCenter, setInitialCenter] = useState<Coordinate | null>(null);
@@ -206,9 +206,13 @@ export default function MapScreen() {
         setRouteCoords(
           coords.map(([lon, lat]) => ({ latitude: lat, longitude: lon })),
         );
+        setRouteDistance(json?.routes?.[0]?.distance ?? null);
+        setRouteDuration(json?.routes?.[0]?.duration ?? null);
       } catch (error) {
         if (!controller.signal.aborted && isMountedRef.current) {
           setRouteCoords([]);
+          setRouteDistance(null);
+          setRouteDuration(null);
         }
       } finally {
         if (isMountedRef.current) setIsFetchingRoute(false);
@@ -242,6 +246,35 @@ export default function MapScreen() {
         hour12: false,
       }).format(journeyStart)
     : "--:--";
+
+  const formattedDistance = useMemo(() => {
+    if (routeDistance == null) return "-";
+    if (routeDistance >= 1000)
+      return `${(routeDistance / 1000).toFixed(1)} km`;
+    return `${Math.round(routeDistance)} m`;
+  }, [routeDistance]);
+
+  const averageSpeed = useMemo(() => {
+    if (routeDistance == null || routeDuration == null || routeDuration === 0)
+      return "-";
+    const speed = (routeDistance / routeDuration) * 3.6;
+    return `${speed.toFixed(1)} km/jam`;
+  }, [routeDistance, routeDuration]);
+
+  const formattedArrival = useMemo(() => {
+    if (routeDuration == null) return "-";
+    const arrival = new Date(Date.now() + routeDuration * 1000);
+    return new Intl.DateTimeFormat("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(arrival);
+  }, [routeDuration]);
+
+  const etaMinutes = useMemo(() => {
+    if (routeDuration == null) return null;
+    return Math.max(1, Math.round(routeDuration / 60));
+  }, [routeDuration]);
 
   return (
     <View style={styles.container}>
@@ -281,11 +314,7 @@ export default function MapScreen() {
         </PointAnnotation>
       </MapboxMap>
 
-      <BottomSheet
-        index={0}
-        snapPoints={snapPoints}
-        enablePanDownToClose={false}
-      >
+      <BottomSheet index={0} snapPoints={snapPoints} enablePanDownToClose={false}>
         <BottomSheetView style={styles.sheetContent}>
           <View style={styles.headerRow}>
             <View>
@@ -316,35 +345,33 @@ export default function MapScreen() {
             <View style={{ flex: 1 }}>
               <View style={styles.destinationRow}>
                 <Text style={styles.destinationLabel}>Tujuan</Text>
-                <Text style={styles.destinationEta}>ETA 22 menit</Text>
+                <Text style={styles.destinationEta}>
+                  {etaMinutes ? `ETA ${etaMinutes} menit` : "ETA --"}
+                </Text>
               </View>
-              <Text style={styles.destinationValue}>
-                Monumen Nasional, Jakarta
-              </Text>
+              <Text style={styles.destinationValue}>Monumen Nasional, Jakarta</Text>
             </View>
           </View>
 
           <View style={styles.metaRow}>
             <View style={styles.metaCol}>
               <Text style={styles.metaLabel}>Jarak</Text>
-              <Text style={styles.metaValue}>{routeCoords.length} titik</Text>
+              <Text style={styles.metaValue}>{formattedDistance}</Text>
             </View>
             <View style={styles.metaCol}>
               <Text style={styles.metaLabel}>Kecepatan rata-rata</Text>
-              <Text style={styles.metaValue}>- km/h</Text>
+              <Text style={styles.metaValue}>{averageSpeed}</Text>
             </View>
             <View style={styles.metaCol}>
               <Text style={styles.metaLabel}>Estimasi tiba</Text>
-              <Text style={styles.metaValue}>-</Text>
+              <Text style={styles.metaValue}>{formattedArrival}</Text>
             </View>
           </View>
 
           <View style={styles.timeline}>
             <View style={styles.timelineRow}>
               <View style={styles.timelineDot} />
-              <Text style={styles.timelineText}>
-                Kendaraan: B 1234 AA (20 A)
-              </Text>
+              <Text style={styles.timelineText}>Kendaraan: B 1234 AA (20 A)</Text>
             </View>
             <View style={styles.timelineRow}>
               <View style={[styles.timelineDot, styles.timelineDotActive]} />
@@ -361,15 +388,12 @@ export default function MapScreen() {
           </View>
 
           <View style={styles.actionRow}>
-            <Button
-              variant="outline"
-              onPress={() => router.push("/tabs/expensesInput")}
-            >
-              <ButtonText>Pengeluaran Perjalanan</ButtonText>
-            </Button>
-            <Button className="w-full">
-              <ButtonText>Selesaikan</ButtonText>
-            </Button>
+            <TouchableOpacity style={[styles.actionButton, styles.cancelButton]}>
+              <Text style={styles.actionText}>Batalkan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.completeButton]}>
+              <Text style={[styles.actionText, { color: "#FFFFFF" }]}>Selesaikan</Text>
+            </TouchableOpacity>
           </View>
         </BottomSheetView>
       </BottomSheet>
@@ -572,7 +596,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   actionRow: {
-    flexDirection: "column",
+    flexDirection: "row",
     gap: 12,
   },
   actionButton: {
