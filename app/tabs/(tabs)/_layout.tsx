@@ -1,10 +1,13 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Tabs } from 'expo-router';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import React from "react";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { Tabs } from "expo-router";
+import { useClientOnlyValue } from "@/components/useClientOnlyValue";
+import { TouchableOpacity } from "react-native";
+import { primaryColor } from "@/constants/Colors";
+import { router } from "expo-router";
 
 function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
+  name: React.ComponentProps<typeof FontAwesome>["name"];
   color: string;
 }) {
   return <FontAwesome size={18} style={{ marginBottom: -3 }} {...props} />;
@@ -16,20 +19,54 @@ export default function TabLayout() {
       screenOptions={{
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
+
+        headerShown: false,
       }}
     >
       <Tabs.Screen
-        name="tab1"
+        name="index"
         options={{
-          title: 'Tab 1',
+          title: "Home",
           tabBarIcon: ({ color }) => <TabBarIcon name="star-o" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="tab2"
+        name="trip"
         options={{
-          title: 'Tab 2',
+          tabBarIcon: ({ color }) => <TabBarIcon name="star-o" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              onPress={() => router.push("/tabs/map")}
+              style={{
+                top: -20,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: primaryColor,
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                elevation: 5,
+              }}
+            >
+              <TabBarIcon name="map" color="#fff" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="document"
+        options={{
+          tabBarIcon: ({ color }) => <TabBarIcon name="star-o" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profil"
+        options={{
           tabBarIcon: ({ color }) => <TabBarIcon name="star-o" color={color} />,
         }}
       />

@@ -14,7 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.starterkitexpo"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +33,13 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "11.16.0"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
