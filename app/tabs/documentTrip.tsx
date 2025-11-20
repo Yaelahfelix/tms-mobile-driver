@@ -1,12 +1,10 @@
 import React from "react";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
-import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Box } from "@/components/ui/box";
+import TripCard from "@/components/Card/TripCard";
 import { Heading } from "@/components/ui/heading";
-import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
 
@@ -67,56 +65,6 @@ const trips = [
     ],
   },
 ];
-
-const TripCard = ({
-  from,
-  to,
-  date,
-  time,
-  status,
-  image,
-  onPress,
-}: {
-  from: string;
-  to: string;
-  date: string;
-  time: string;
-  status: string;
-  image: string;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity
-    activeOpacity={0.85}
-    onPress={onPress}
-    className="rounded-2xl border border-background-200 bg-white p-4"
-  >
-    <View className="flex-row items-center gap-3">
-      <View className="flex-1 gap-3">
-        <View className="flex-row items-center justify-between">
-          <Heading size="md">{from}</Heading>
-          <Icon as={FontAwesome} name="long-arrow-right" size="md" className="text-slate-500" />
-          <Heading size="md">{to}</Heading>
-        </View>
-
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2">
-            <Icon as={FontAwesome} name="calendar" size="xs" className="text-slate-500" />
-            <Text className="text-slate-600">{date}</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <Icon as={FontAwesome} name="clock-o" size="xs" className="text-slate-500" />
-            <Text className="text-slate-600">{time}</Text>
-          </View>
-          <Box className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1">
-            <Text className="text-primary-700 text-xs font-semibold">{status}</Text>
-          </Box>
-        </View>
-      </View>
-
-      <Image source={{ uri: image }} className="h-20 w-20 rounded-xl" resizeMode="cover" />
-    </View>
-  </TouchableOpacity>
-);
 
 export default function DocumentTrip() {
   const router = useRouter();
