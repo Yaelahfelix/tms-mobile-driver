@@ -1,18 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import MapView, { Marker, Polyline, UrlTile } from "react-native-maps";
+import Mapbox, {
+  Camera,
+  CameraRef,
+  LineLayer,
+  MapView as MapboxMap,
+  PointAnnotation,
+  ShapeSource,
+  UserLocation,
+} from "@rnmapbox/maps";
 import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
 import * as Location from "expo-location";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import type { FeatureCollection, LineString } from "geojson";
 
 const DESTINATION = {
   latitude: -6.1754,
   longitude: 106.8272,
 };
 
-const DEFAULT_REGION_DELTA = {
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
+const DEFAULT_ZOOM_LEVEL = 14;
+
+const routeLineStyle = {
+  lineColor: "#2196F3",
+  lineWidth: 4,
+  lineCap: "round" as const,
+  lineJoin: "round" as const,
 };
 
 type Coordinate = { latitude: number; longitude: number };
@@ -72,7 +85,7 @@ function applyKalmanFilter(
 }
 
 export default function MapScreen() {
-  const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<CameraRef | null>(null);
   const kalmanStateRef = useRef<KalmanState | null>(null);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const isMountedRef = useRef(true);
@@ -84,7 +97,7 @@ export default function MapScreen() {
   const [routeCoords, setRouteCoords] = useState<Coordinate[]>([]);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   const [journeyStart, setJourneyStart] = useState<Date | null>(null);
-  const [initialRegion, setInitialRegion] = useState<Coordinate | null>(null);
+  const [initialCenter, setInitialCenter] = useState<Coordinate | null>(null);
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
 
   const snapPoints = useMemo(() => ["38%", "72%"], []);
@@ -116,10 +129,14 @@ export default function MapScreen() {
 
       setCurrent(initialCoordinate);
       setJourneyStart(new Date());
-      setInitialRegion(initialCoordinate);
-      mapRef.current?.animateToRegion({
-        ...initialCoordinate,
-        ...DEFAULT_REGION_DELTA,
+      setInitialCenter(initialCoordinate);
+      cameraRef.current?.setCamera({
+        centerCoordinate: [
+          initialCoordinate.longitude,
+          initialCoordinate.latitude,
+        ],
+        zoomLevel: DEFAULT_ZOOM_LEVEL,
+        animationDuration: 800,
       });
 
       watchRef.current = await Location.watchPositionAsync(
@@ -134,9 +151,10 @@ export default function MapScreen() {
             kalmanStateRef,
           );
           setCurrent(filtered);
-          mapRef.current?.animateToRegion({
-            ...filtered,
-            ...DEFAULT_REGION_DELTA,
+          cameraRef.current?.setCamera({
+            centerCoordinate: [filtered.longitude, filtered.latitude],
+            zoomLevel: DEFAULT_ZOOM_LEVEL,
+            animationDuration: 800,
           });
         },
       );
@@ -156,7 +174,10 @@ export default function MapScreen() {
         const detail = geo.district || geo.city || geo.subregion || "";
         setCurrentAddress(`${street}${detail ? ", " + detail : ""}`);
       } catch {
-        if (!cancelled) setCurrentAddress(`Lat ${current.latitude.toFixed(4)}, Lon ${current.longitude.toFixed(4)}`);
+        if (!cancelled)
+          setCurrentAddress(
+            `Lat ${current.latitude.toFixed(4)}, Lon ${current.longitude.toFixed(4)}`,
+          );
       }
     })();
 
@@ -195,104 +216,148 @@ export default function MapScreen() {
     return () => controller.abort();
   }, [current.latitude, current.longitude, hasPermission]);
 
+  const routeGeoJson: FeatureCollection<LineString> = useMemo(
+    () => ({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: routeCoords.map((c) => [c.longitude, c.latitude]),
+          },
+          properties: {},
+        },
+      ],
+    }),
+    [routeCoords],
+  );
+
   const formattedStartTime = journeyStart
     ? new Intl.DateTimeFormat("id-ID", {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       }).format(journeyStart)
-    : "-";
-
-  const formattedDate = new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+    : "--:--";
 
   return (
-    <View style={styles.container}>
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={{
-          ...(initialRegion || DESTINATION),
-          ...DEFAULT_REGION_DELTA,
-        }}
-        showsUserLocation
+      <View style={styles.container}>
+        <MapboxMap
+          style={styles.map}
+          styleURL={Mapbox.StyleURL.Street}
+          compassEnabled={false}
+        logoEnabled={false}
+        scaleBarEnabled={false}
       >
-        <UrlTile
-          urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-        />
-
-        <Marker coordinate={DESTINATION} title="Tujuan Demo" />
-        <Marker coordinate={current} title="Posisi Kamu" pinColor="#1D4ED8" />
-
-        {routeCoords.length > 0 && (
-          <Polyline
-            coordinates={routeCoords}
-            strokeWidth={5}
-            strokeColor="#2D8CFF"
+        {initialCenter && (
+          <Camera
+            ref={cameraRef}
+            centerCoordinate={[initialCenter.longitude, initialCenter.latitude]}
+            zoomLevel={DEFAULT_ZOOM_LEVEL}
+            animationDuration={0}
           />
         )}
-      </MapView>
+        <UserLocation
+          androidRenderMode="gps"
+          showsUserHeadingIndicator
+          animated
+          minDisplacement={1}
+        />
+        {routeCoords.length > 0 && (
+          <ShapeSource id="route" shape={routeGeoJson}>
+            <LineLayer id="routeLine" style={routeLineStyle} />
+          </ShapeSource>
+        )}
+        <PointAnnotation
+          id="destination"
+          coordinate={[DESTINATION.longitude, DESTINATION.latitude]}
+        >
+          <View style={styles.destinationMarker}>
+            <Ionicons name="flag" size={16} color="white" />
+          </View>
+        </PointAnnotation>
+      </MapboxMap>
 
-      <BottomSheet snapPoints={snapPoints} enablePanDownToClose={false}>
+      <BottomSheet index={0} snapPoints={snapPoints} enablePanDownToClose={false}>
         <BottomSheetView style={styles.sheetContent}>
-          <View style={styles.routeRow}>
+          <View style={styles.headerRow}>
             <View>
-              <Text style={styles.routeTitle}>Bandung → Jakarta</Text>
-              <Text style={styles.dateText}>{formattedDate}</Text>
+              <Text style={styles.sectionLabel}>Perjalanan dimulai</Text>
+              <Text style={styles.sectionValue}>{formattedStartTime}</Text>
             </View>
-            <View style={styles.badge}>
-              <Ionicons name="navigate" size={16} color="#0F5132" />
-              <Text style={styles.badgeText}>En Route</Text>
+            <View style={styles.statusPill}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Perjalanan Berlangsung</Text>
+            </View>
+          </View>
+
+          <View style={styles.locationCard}>
+            <View style={styles.locationText}>
+              <Text style={styles.locationLabel}>Posisi Saat Ini</Text>
+              <Text style={styles.locationValue}>{currentAddress}</Text>
+            </View>
+            <TouchableOpacity style={styles.mapButton}>
+              <Ionicons name="map" size={20} color="#1E88E5" />
+              <Text style={styles.mapButtonText}>Buka Maps</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.destinationCard}>
+            <View style={styles.destinationIconWrapper}>
+              <Ionicons name="flag" size={20} color="#ffffff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.destinationRow}>
+                <Text style={styles.destinationLabel}>Tujuan</Text>
+                <Text style={styles.destinationEta}>ETA 22 menit</Text>
+              </View>
+              <Text style={styles.destinationValue}>Monumen Nasional, Jakarta</Text>
             </View>
           </View>
 
           <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={16} color="#111827" />
-              <Text style={styles.metaLabel}>{formattedDate}</Text>
+            <View style={styles.metaCol}>
+              <Text style={styles.metaLabel}>Jarak</Text>
+              <Text style={styles.metaValue}>{routeCoords.length} titik</Text>
             </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="alarm-outline" size={16} color="#111827" />
-              <Text style={styles.metaLabel}>{formattedStartTime} WIB</Text>
+            <View style={styles.metaCol}>
+              <Text style={styles.metaLabel}>Kecepatan rata-rata</Text>
+              <Text style={styles.metaValue}>- km/h</Text>
             </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Posisi Kamu Saat Ini</Text>
-            <Text style={styles.sectionValue}>{currentAddress}</Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Status Log</Text>
-            <Text style={styles.sectionValue}>
-              Perjalanan dimulai sejak {formattedStartTime} WIB
-            </Text>
-          </View>
-
-          <View style={styles.vehicleCard}>
-            <View style={styles.vehicleInfo}>
-              <View style={styles.vehicleAvatar}>
-                <Ionicons name="bus" size={24} color="#1F2937" />
-              </View>
-              <View>
-                <Text style={styles.vehicleTitle}>Mitsubishi Fuso</Text>
-                <Text style={styles.vehiclePlate}>AB 1234 CD</Text>
-                <TouchableOpacity>
-                  <Text style={styles.link}>Lihat Detail Kendaraan</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.metaCol}>
+              <Text style={styles.metaLabel}>Estimasi tiba</Text>
+              <Text style={styles.metaValue}>-</Text>
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.button, styles.primaryButton]}>
-            <Text style={styles.primaryText}>Selesaikan Perjalanan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]}>
-            <Text style={styles.secondaryText}>Masukkan Pengeluaran Perjalanan</Text>
-          </TouchableOpacity>
+          <View style={styles.timeline}>
+            <View style={styles.timelineRow}>
+              <View style={styles.timelineDot} />
+              <Text style={styles.timelineText}>Kendaraan: B 1234 AA (20 A)</Text>
+            </View>
+            <View style={styles.timelineRow}>
+              <View style={[styles.timelineDot, styles.timelineDotActive]} />
+              <Text style={styles.timelineText}>Sampai di hub penjemputan</Text>
+            </View>
+            <View style={styles.timelineRow}>
+              <View style={styles.timelineDot} />
+              <Text style={styles.timelineText}>Sedang dalam perjalanan</Text>
+            </View>
+            <View style={styles.timelineRow}>
+              <View style={styles.timelineDot} />
+              <Text style={styles.timelineText}>Tiba di tujuan</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={[styles.actionButton, styles.cancelButton]}>
+              <Text style={styles.actionText}>Batalkan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.completeButton]}>
+              <Text style={[styles.actionText, { color: "#FFFFFF" }]}>Selesaikan</Text>
+            </TouchableOpacity>
+          </View>
         </BottomSheetView>
       </BottomSheet>
     </View>
@@ -300,59 +365,220 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F3F4F6" },
-  map: { flex: 1 },
-  sheetContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  routeRow: {
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f6f8",
+  },
+  map: {
+    flex: 1,
+  },
+  destinationMarker: {
+    backgroundColor: "#1E88E5",
+    borderRadius: 16,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 28,
+    gap: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sectionLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  sectionValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e8f2ff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#1E88E5",
+    marginRight: 8,
+  },
+  statusText: {
+    color: "#1E88E5",
+    fontWeight: "600",
+  },
+  locationCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  routeTitle: { fontWeight: "700", fontSize: 18, color: "#111827" },
-  dateText: { color: "#6B7280", marginTop: 2 },
-  badge: {
+  locationText: {
+    flex: 1,
+    marginRight: 12,
+  },
+  locationLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  locationValue: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  mapButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#D1E7DD",
-    borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#e8f2ff",
   },
-  badgeText: { color: "#0F5132", fontWeight: "600", marginLeft: 6 },
+  mapButtonText: {
+    color: "#1E88E5",
+    fontWeight: "700",
+    marginLeft: 6,
+  },
+  destinationCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  destinationIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#1E88E5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  destinationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  destinationLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  destinationEta: {
+    color: "#111827",
+    fontWeight: "700",
+  },
+  destinationValue: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "700",
+  },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
   },
-  metaItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  metaLabel: { color: "#111827", fontSize: 14 },
-  section: { gap: 4 },
-  sectionTitle: { color: "#6B7280", fontSize: 12, textTransform: "uppercase" },
-  sectionValue: { color: "#111827", fontSize: 14, fontWeight: "600" },
-  vehicleCard: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
+  metaCol: {
+    flex: 1,
+    backgroundColor: "#ffffff",
     padding: 12,
-  },
-  vehicleInfo: { flexDirection: "row", gap: 12, alignItems: "center" },
-  vehicleAvatar: {
-    width: 64,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  vehicleTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
-  vehiclePlate: { color: "#6B7280", marginVertical: 2 },
-  link: { color: "#2563EB", fontWeight: "600" },
-  button: {
     borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  primaryButton: { backgroundColor: "#22C55E" },
-  secondaryButton: { backgroundColor: "#E5E7EB" },
-  primaryText: { color: "#FFFFFF", fontWeight: "700" },
-  secondaryText: { color: "#111827", fontWeight: "700" },
+  metaLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  metaValue: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  timeline: {
+    backgroundColor: "#ffffff",
+    padding: 12,
+    borderRadius: 12,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  timelineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
+  },
+  timelineDotActive: {
+    borderColor: "#1E88E5",
+    backgroundColor: "#1E88E5",
+  },
+  timelineText: {
+    color: "#111827",
+    fontWeight: "600",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  cancelButton: {
+    backgroundColor: "#ffffff",
+  },
+  completeButton: {
+    backgroundColor: "#1E88E5",
+    borderColor: "#1E88E5",
+  },
+  actionText: {
+    color: "#111827",
+    fontWeight: "700",
+  },
 });
